@@ -12,16 +12,16 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Add password protection to Addons
         shell: bash
@@ -29,47 +29,106 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
 
-          path = Path(
-              "composeApp/src/commonMain/kotlin/com/nuvio/app/features/addons/AddonsScreen.kt"
-          )
-
+          path = Path("composeApp/src/commonMain/kotlin/com/nuvio/app/features/addons/AddonsScreen.kt")
           text = path.read_text()
 
-          # Add imports needed for password field
           if "import androidx.compose.material3.OutlinedTextField" not in text:
               text = text.replace(
                   "import androidx.compose.material3.MaterialTheme\n",
-                  "import androidx.compose.material3.MaterialTheme\n"
-                  "import androidx.compose.material3.OutlinedTextField\n"
+                  "import androidx.compose.material3.MaterialTheme\nimport androidx.compose.material3.OutlinedTextField\n",
+                  1,
               )
 
           if "import androidx.compose.ui.text.input.PasswordVisualTransformation" not in text:
               text = text.replace(
                   "import androidx.compose.ui.text.style.TextOverflow\n",
-                  "import androidx.compose.ui.text.input.PasswordVisualTransformation\n"
-                  "import androidx.compose.ui.text.style.TextOverflow\n"
+                  "import androidx.compose.ui.text.input.PasswordVisualTransformation\nimport androidx.compose.ui.text.style.TextOverflow\n",
+                  1,
               )
 
-          old = '''@Composable
-          fun AddonsScreen(
-              modifier: Modifier = Modifier,
-              title: String? = null,
-              onBack: (() -> Unit)? = null,
-          ) {
-              NuvioScreen(modifier = modifier) {
-                  stickyHeader {
-                      NuvioScreenHeader(
-                          title = title ?: stringResource(Res.string.addon_title),
-                          onBack = onBack,
-                      ) {
-                      }
-                  }
-                  item {
-                      AddonsSettingsPageContent()
-                  }
-              }
-          }'''
+          start = text.index("@Composable\nfun AddonsScreen(")
+          marker = "\n@Composable\ninternal fun AddonsSettingsPageContent("
+          end = text.index(marker, start)
 
-          new = '''@Composable
-          fun AddonsScreen(
-              modifier: Modifier
+          new_lines = [
+              "@Composable",
+              "fun AddonsScreen(",
+              "    modifier: Modifier = Modifier,",
+              "    title: String? = null,",
+              "    onBack: (() -> Unit)? = null,",
+              ") {",
+              "    var isUnlocked by rememberSaveable { mutableStateOf(false) }",
+              '    var password by rememberSaveable { mutableStateOf("") }',
+              "    var passwordError by rememberSaveable { mutableStateOf(false) }",
+              "",
+              "    NuvioScreen(modifier = modifier) {",
+              "        stickyHeader {",
+              "            NuvioScreenHeader(",
+              "                title = title ?: stringResource(Res.string.addon_title),",
+              "                onBack = onBack,",
+              "            ) {",
+              "            }",
+              "        }",
+              "        item {",
+              "            if (isUnlocked) {",
+              "                AddonsSettingsPageContent()",
+              "            } else {",
+              "                Column(",
+              "                    modifier = Modifier",
+              "                        .fillMaxWidth()",
+              "                        .padding(16.dp),",
+              "                    verticalArrangement = Arrangement.spacedBy(12.dp),",
+              "                ) {",
+              '                    Text(text = "Addon section is locked")',
+              "                    OutlinedTextField(",
+              "                        value = password,",
+              "                        onValueChange = {",
+              "                            password = it",
+              "                            passwordError = false",
+              "                        },",
+              "                        modifier = Modifier.fillMaxWidth(),",
+              "                        singleLine = true,",
+              '                        label = { Text("Password") },',
+              "                        visualTransformation = PasswordVisualTransformation(),",
+              "                        isError = passwordError,",
+              "                    )",
+              "                    if (passwordError) {",
+              '                        Text("Incorrect password", color = MaterialTheme.colorScheme.error)',
+              "                    }",
+              "                    NuvioPrimaryButton(",
+              '                        text = "Unlock Addons",',
+              "                        enabled = password.isNotBlank(),",
+              "                        onClick = {",
+              '                            if (password == "400400400") {',
+              "                                isUnlocked = true",
+              '                                password = ""',
+              "                                passwordError = false",
+              "                            } else {",
+              "                                passwordError = true",
+              "                            }",
+              "                        },",
+              "                    )",
+              "                }",
+              "            }",
+              "        }",
+              "    }",
+              "}",
+          ]
+
+          text = text[:start] + "\n".join(new_lines) + text[end:]
+          path.write_text(text)
+          print("Addon password lock added.")
+          PY
+
+      - name: Make Gradle executable
+        run: chmod +x gradlew
+
+      - name: Build APK
+        run: ./gradlew :androidApp:assembleFullDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: ExtremeOS-APK
+          path: androidApp/build/outputs/apk/full/debug/*.apk
+          if-no-files-found: error
