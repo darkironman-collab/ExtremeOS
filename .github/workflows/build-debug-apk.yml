@@ -1,3 +1,28 @@
+name: Build ExtremeOS APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
       - name: Lock Content and Discovery
         shell: bash
         run: |
@@ -71,7 +96,9 @@
                                   },
                                   modifier = Modifier.fillMaxWidth(),
                                   singleLine = true,
-                                  label = { Text("Password") },
+                                  label = {
+                                      Text("Password")
+                                  },
                                   visualTransformation = PasswordVisualTransformation(),
                                   isError = passwordError,
                               )
@@ -106,30 +133,4 @@
                                   ),
                                   description = stringResource(
                                       if (AppFeaturePolicy.personalMediaAddonCopyEnabled) {
-                                          Res.string.settings_content_discovery_addons_description_appstore
-                                      } else {
-                                          Res.string.settings_content_discovery_addons_description
-                                      }
-                                  ),
-                                  isTablet = isTablet,
-                                  onClick = onAddonsClick,
-                              )
-
-                              if (showPluginsEntry) {
-                                  SettingsNavigationRow(
-                                      title = stringResource(
-                                          Res.string.compose_settings_page_plugins
-                                      ),
-                                      description = stringResource(
-                                          Res.string.settings_content_discovery_plugins_description
-                                      ),
-                                      isTablet = isTablet,
-                                      onClick = onPluginsClick,
-                                  )
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-          EOF
+                                          Res.string
