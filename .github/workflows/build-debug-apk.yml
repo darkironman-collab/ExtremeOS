@@ -122,7 +122,10 @@ jobs:
 
       - name: Make Gradle executable
         run: chmod +x gradlew
-
+        
+      - name: Create local.properties
+        run: touch local.properties
+        
       - name: Build APK
         run: ./gradlew :androidApp:assembleFullDebug --stacktrace
 
