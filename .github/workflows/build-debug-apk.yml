@@ -1,0 +1,75 @@
+name: Build ExtremeOS APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Add password protection to Addons
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path(
+              "composeApp/src/commonMain/kotlin/com/nuvio/app/features/addons/AddonsScreen.kt"
+          )
+
+          text = path.read_text()
+
+          # Add imports needed for password field
+          if "import androidx.compose.material3.OutlinedTextField" not in text:
+              text = text.replace(
+                  "import androidx.compose.material3.MaterialTheme\n",
+                  "import androidx.compose.material3.MaterialTheme\n"
+                  "import androidx.compose.material3.OutlinedTextField\n"
+              )
+
+          if "import androidx.compose.ui.text.input.PasswordVisualTransformation" not in text:
+              text = text.replace(
+                  "import androidx.compose.ui.text.style.TextOverflow\n",
+                  "import androidx.compose.ui.text.input.PasswordVisualTransformation\n"
+                  "import androidx.compose.ui.text.style.TextOverflow\n"
+              )
+
+          old = '''@Composable
+          fun AddonsScreen(
+              modifier: Modifier = Modifier,
+              title: String? = null,
+              onBack: (() -> Unit)? = null,
+          ) {
+              NuvioScreen(modifier = modifier) {
+                  stickyHeader {
+                      NuvioScreenHeader(
+                          title = title ?: stringResource(Res.string.addon_title),
+                          onBack = onBack,
+                      ) {
+                      }
+                  }
+                  item {
+                      AddonsSettingsPageContent()
+                  }
+              }
+          }'''
+
+          new = '''@Composable
+          fun AddonsScreen(
+              modifier: Modifier
