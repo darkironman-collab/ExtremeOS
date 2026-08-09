@@ -1,0 +1,89 @@
+name: Build Just DV Player APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["just-dv-player"]
+    paths:
+      - "Just-DV-Player/**"
+      - ".github/workflows/build-just-dv-player.yml"
+  pull_request:
+    branches: ["cmp-rewrite"]
+    paths:
+      - "Just-DV-Player/**"
+      - ".github/workflows/build-just-dv-player.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout customization repo
+        uses: actions/checkout@v6
+
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 36 and NDK
+        run: yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865"
+
+      - name: Clone official Just Player
+        run: |
+          git clone https://github.com/moneytoo/Player.git upstream
+          cd upstream
+          git checkout fb436e14a5cc03998e69a166f00401ddbc71a138
+
+      - name: Apply Extreme DV clean UI patch
+        run: |
+          cp Just-DV-Player/java/*.java upstream/app/src/main/java/com/brouken/player/
+          cd upstream
+          python3 "$GITHUB_WORKSPACE/Just-DV-Player/patch_just_player.py"
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build libdovi JNI
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/29.0.14206865
+        run: |
+          cd Just-DV-Player/native-rpu
+          cargo ndk \
+            -t arm64-v8a \
+            -t armeabi-v7a \
+            -t x86_64 \
+            -o "$GITHUB_WORKSPACE/upstream/app/src/main/jniLibs" \
+            build --release
+
+      - name: Build Just Player based APK
+        run: |
+          cd upstream
+          chmod +x gradlew
+          ./gradlew :app:assembleLatestUniversalDebug --stacktrace
+
+      - name: Collect APK
+        run: |
+          APK=$(find upstream/app/build/outputs/apk -type f -name '*.apk' | head -n 1)
+          test -n "$APK"
+          cp "$APK" Extreme-DV-Player-Just-0.4-debug.apk
+          ls -lh Extreme-DV-Player-Just-0.4-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: Extreme-DV-Player-Just-0.4-debug
+          path: Extreme-DV-Player-Just-0.4-debug.apk
+          if-no-files-found: error
