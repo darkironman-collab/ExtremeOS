@@ -7,6 +7,11 @@ on:
     paths:
       - "Extreme-DV-Player/**"
       - ".github/workflows/build-extreme-dv-player.yml"
+  pull_request:
+    branches: ["cmp-rewrite"]
+    paths:
+      - "Extreme-DV-Player/**"
+      - ".github/workflows/build-extreme-dv-player.yml"
 
 permissions:
   contents: read
