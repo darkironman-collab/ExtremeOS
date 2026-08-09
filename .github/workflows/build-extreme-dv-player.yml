@@ -51,12 +51,13 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
         run: |
+          cd native-rpu
           cargo ndk \
             -t arm64-v8a \
             -t armeabi-v7a \
             -t x86_64 \
-            -o app/src/main/jniLibs \
-            build --release --manifest-path native-rpu/Cargo.toml
+            -o ../app/src/main/jniLibs \
+            build --release
 
       - name: Gradle 8.13
         uses: gradle/actions/setup-gradle@v6
